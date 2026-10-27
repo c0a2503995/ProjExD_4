@@ -287,11 +287,10 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird,0))
-                print("b")
-            if event.type == pg.KEYDOWN and event.key == pg.K_k:
-                beams.add(NeoBeam(bird,3).gen_beams)
-                print("a")
+                if key_lst[pg.K_LSHIFT]:
+                    beams.add(NeoBeam(bird,3).gen_beams())
+                else:
+                    beams.add(Beam(bird,0))
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
