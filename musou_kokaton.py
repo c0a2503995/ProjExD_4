@@ -35,7 +35,7 @@ def calc_orientation(org: pg.Rect, dst: pg.Rect) -> tuple[float, float]:
     return x_diff/norm, y_diff/norm
 
 
-class Bird(pg.sprite.Sprite):
+class Bird(pg.sprite.Sprite): #クラスの継承　他で定義した変数名をそのまま使える
     """
     ゲームキャラクター（こうかとん）に関するクラス
     """
@@ -240,7 +240,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 1000
+        self.value = 0
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -250,12 +250,37 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+class Life:
+    """
+    ライフを表示する
+    初期残機数：3
+    爆弾に当たるたびに1減る
+    画面右下に描画
+    """
+    def __init__(self, num: int):
+        self.font = pg.font.Font(None, 40)
+        self.color = (255, 0, 0)
+        self.num = num
+        self.image = pg.Surface((40, 40))
+        self.image.set_colorkey((0, 0, 0))
+        points = [(16*math.sin(t/100)**3 + 20,
+                   -(13*math.cos(t/100)-5*math.cos(2*t/100)-2*math.cos(3*t/100)-math.cos(4*t/100)) + 20)
+                  for t in range(0, 628)]
+        pg.draw.polygon(self.image, self.color, points)
+        self.rect = self.image.get_rect()
+        self.rect.center = (WIDTH - 50, HEIGHT - 50)
+
+    def update(self, screen: pg.Surface):
+        for i in range(self.num):
+            screen.blit(self.image, (WIDTH - 50 - i * 50, HEIGHT - 50))
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     score = Score()
-
+    life = Life(3)  # feature1  初期残機数を3にする
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
@@ -294,20 +319,23 @@ def main():
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
-            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-            score.value += 1  # 1点アップ
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト　#衝突したらどっちも消える
+            score.value += 1  # 1点アップ　　　　　　　　　　　#削除したいときはTrue、残すときはFalse
 
         # 追加機能4
         for bomb in pg.sprite.spritecollide(bird, bombs, True): 
+            
             if bird.state == "hyper":  # ★変更箇所: 無敵状態の場合はゲームオーバーにならず爆弾を消す
                 exps.add(Explosion(bomb, 50)) 
                 score.value += 1               
             else:  # ★変更箇所: 通常状態の場合は従来通りゲームオーバー処理
-                bird.change_img(8, screen)  
-                score.update(screen)
-                pg.display.update()
-                time.sleep(2)
-                return
+                life.num -= 1  #feature1 残機数を1減らす
+                if life.num <= 0: #feature1 ライフが０になったら
+                    bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+                    score.update(screen)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
 
         bird.update(key_lst, screen)
         beams.update()
@@ -319,6 +347,7 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        life.update(screen) #feature1
         pg.display.update()
         tmr += 1
         clock.tick(50)
