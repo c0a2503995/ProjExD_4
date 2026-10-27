@@ -134,6 +134,7 @@ class Bomb(pg.sprite.Sprite):
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
         self.speed = 6
+        self.state = "active"  # feature3 stateは爆弾の無効化と有効化を指す
 
     def update(self):
         """
@@ -296,6 +297,41 @@ class Gravity(pg.sprite.Sprite):
             self.kill()
 
 
+class EMP(pg.sprite.Sprite):  # feature3
+    """
+    発動時に存在する敵機と爆弾を無効化するクラス
+    eキー押下かつスコアが20より大きいとスコアを20消費してempを使う
+    """
+    def __init__(self, enemy: pg.sprite.Group, bomb: pg.sprite.Group, screen: pg.Surface):
+        """
+        引数enemyは敵のグループ
+        引数bombは爆弾のグループ
+        引数screenは画面サーフェイス
+        """
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        self.image.fill((255, 255, 0))
+        self.image.set_alpha(100)
+        self.rect = self.image.get_rect()
+        self.life = 3
+
+        for teki in enemy:
+            teki.interval = float("inf")
+            teki.image = pg.transform.laplacian(teki.image)
+
+        for bakudan in bomb:
+            bakudan.speed //= 2
+            bakudan.state = "inactive"
+
+    def update(self):
+        """
+        empの時間を管理し、一定時間経過後黄色の矩形を消滅させる
+        """
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -308,8 +344,8 @@ def main():
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     gras = pg.sprite.Group()  #追加2:重力場を管理するGroup
-
-
+    emp = pg.sprite.Group()
+    
     tmr = 0
     clock = pg.time.Clock()
     while True:
@@ -319,13 +355,17 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.KEYDOWN and event.key == pg.K_e:  # feature3
+                if score.value > 20:
+                    score.value -= 20
+                    emp.add(EMP(emys, bombs, screen))
+                    
             # 追加機能4: 
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:  # ★変更箇所: 右Shiftキーで無敵状態を発動
                 if score.value > 100:
                     bird.state = "hyper"
                     bird.hyper_life = 500
                     score.value -= 100
-
 
             #追加2:発動判定
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
@@ -379,12 +419,15 @@ def main():
             exps.add(Explosion(emy, 100))
             score.value += 10
 
-        for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
-            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
-            score.update(screen)
-            pg.display.update()
-            time.sleep(2)
-            return
+        for bomb in pg.sprite.spritecollide(bird, bombs, False):  # こうかとんと衝突した爆弾リスト feature3:第三引数をFalseに変更した
+            if bomb.state == "inactive":  # feature3 ifとelseの条件分岐を追加した
+                bomb.kill()  # 通常の場合はelseが実行されるが、empで無効かされたらifを通る
+            else:
+                bird.change_img(8, screen)  # こうかとん悲しみエフェクト 
+                score.update(screen)
+                pg.display.update()
+                time.sleep(2)
+                return
 
         bird.update(key_lst, screen)
         beams.update()
@@ -397,6 +440,8 @@ def main():
         exps.draw(screen)
         gras.update()  #追加2:重力場の更新
         gras.draw(screen)  #追加2:重力場の描画
+        emp.update()  # feature3
+        emp.draw(screen)  # feature3
         score.update(screen)
         life.update(screen) #feature1
         pg.display.update()
