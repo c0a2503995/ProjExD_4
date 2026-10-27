@@ -241,6 +241,7 @@ class Score:
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
 
+
 class Life:
     """
     ライフを表示する
@@ -264,11 +265,6 @@ class Life:
     def update(self, screen: pg.Surface):
         for i in range(self.num):
             screen.blit(self.image, (WIDTH - 50 - i * 50, HEIGHT - 50))
-
-
-
-
-
 
 
 def main():
@@ -319,8 +315,6 @@ def main():
                 pg.display.update()
                 time.sleep(2)
                 return
-
-
 
         bird.update(key_lst, screen)
         beams.update()
