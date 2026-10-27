@@ -150,7 +150,7 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird,angle0:int):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん
@@ -158,6 +158,7 @@ class Beam(pg.sprite.Sprite):
         super().__init__()
         self.vx, self.vy = bird.dire
         angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle += angle0 ###Beamクラスのイニシャライザの引数に回転角度を追加しビームの回転角度に加算
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
@@ -174,6 +175,28 @@ class Beam(pg.sprite.Sprite):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+
+class NeoBeam(pg.sprite.Sprite):
+    """
+    散弾に関するクラス
+    """
+    def __init__(self, bird: Bird,num:int):
+        """
+        引数１　bird:　こうかとんクラス
+        引数２　num :  ビームの数
+        """
+        self.num = num
+        self.rect = bird.rect.center
+        self.imag = bird.image
+        self.bird = bird
+
+    def gen_beams(self):
+        beams = []
+        step = int(100/self.num-1)
+        for i in range(-50,+51,step):
+            beams.append(Beam(self.bird,i))
+            
+        return beams
 
 
 class Explosion(pg.sprite.Sprite):
@@ -241,7 +264,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 1000
+        self.value = 0
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -368,6 +391,8 @@ def main():
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     score = Score()
     life = Life(3)  # feature1  初期残機数を3にする
+    dansuu = 3 #弾幕の数
+
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
@@ -377,6 +402,7 @@ def main():
     emp = pg.sprite.Group()
     def_wall = pg.sprite.Group()
 
+    print(type(bird))
     tmr = 0
     clock = pg.time.Clock()
     while True:
@@ -385,11 +411,15 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                if key_lst[pg.K_LSHIFT]:
+                    beams.add(NeoBeam(bird,3).gen_beams())
+                else:
+                     beams.add(Beam(bird,0))
+
             if event.type == pg.KEYDOWN and event.key == pg.K_e:  # feature3
                 if score.value > 20:
                     score.value -= 20
-                    emp.add(EMP(emys, bombs, screen))
+                    emp.add(EMP(emys, bombs, screen)) 
                     
             # 追加機能4: 
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:  # ★変更箇所: 右Shiftキーで無敵状態を発動
@@ -411,9 +441,6 @@ def main():
                     def_wall.add(Defense_Wall(bird, 400))
 
         screen.blit(bg_img, [0, 0])  # ★変更箇所: 描画先の座標 [0, 0] を追加してエラーを修正
-
-
-        screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
