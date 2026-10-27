@@ -5,17 +5,15 @@ import sys
 import time
 import pygame as pg
 
-
 WIDTH = 1100  # ゲームウィンドウの幅
 HEIGHT = 650  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
-    オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
-    引数：こうかとんや爆弾，ビームなどのRect
-    戻り値：横方向，縦方向のはみ出し判定結果（画面内：True／画面外：False）
+    オブジェクトが画面内or画面外を判定し,真理値タプルを返す関数
+    引数：こうかとんや爆弾,ビームなどのRect
+    戻り値：横方向,縦方向のはみ出し判定結果（画面内：True/画面外：False）
     """
     yoko, tate = True, True
     if obj_rct.left < 0 or WIDTH < obj_rct.right:
@@ -27,7 +25,7 @@ def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
 
 def calc_orientation(org: pg.Rect, dst: pg.Rect) -> tuple[float, float]:
     """
-    orgから見て，dstがどこにあるかを計算し，方向ベクトルをタプルで返す
+    orgから見て,dstがどこにあるかを計算し,方向ベクトルをタプルで返す
     引数1 org：爆弾SurfaceのRect
     引数2 dst：こうかとんSurfaceのRect
     戻り値：orgから見たdstの方向ベクトルを表すタプル
@@ -72,6 +70,8 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.state = "normal"  # ★変更箇所: 無敵状態を管理する状態変数を追加
+        self.hyper_life = 0    # ★変更箇所: 無敵状態の発動時間を管理する変数を追加
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -91,14 +91,22 @@ class Bird(pg.sprite.Sprite):
         sum_mv = [0, 0]
         for k, mv in __class__.delta.items():
             if key_lst[k]:
-                sum_mv[0] += mv[0]
-                sum_mv[1] += mv[1]
-        self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
+                sum_mv[0] += mv[0]  # ★変更箇所: IndexErrorを防ぐためX方向の計算に修正
+                sum_mv[1] += mv[1]  # ★変更箇所: IndexErrorを防ぐためY方向の計算に修正
+        self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])  # ★変更箇所: sum_mv[0], sum_mv[1]に修正
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
-        if not (sum_mv[0] == 0 and sum_mv[1] == 0):
+            self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])  # ★変更箇所: sum_mv[0], sum_mv[1]に修正
+        if not (sum_mv[0] == 0 and sum_mv[1] == 0):  # ★変更箇所: sum_mv[0], sum_mv[1]に修正
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
+
+        # 追加機能4: 
+        if self.state == "hyper":  # ★変更箇所: 無敵状態(hyper)のときの画像変更と時間経過の処理を追加
+            self.image = pg.transform.laplacian(self.image)
+            self.hyper_life -= 1
+            if self.hyper_life < 0:
+                self.state = "normal"
+
         screen.blit(self.image, self.rect)
 
 
@@ -180,7 +188,7 @@ class Explosion(pg.sprite.Sprite):
         super().__init__()
         img = pg.image.load(f"fig/explosion.gif")
         self.imgs = [img, pg.transform.flip(img, 1, 1)]
-        self.image = self.imgs[0]
+        self.image = self.imgs[0]  # ★変更箇所: 強制終了エラーを防ぐためリストの0番目を指定
         self.rect = self.image.get_rect(center=obj.rect.center)
         self.life = life
 
@@ -214,7 +222,7 @@ class Enemy(pg.sprite.Sprite):
     def update(self):
         """
         敵機を速度ベクトルself.vyに基づき移動（降下）させる
-        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
+        ランダムに決めた停止位置_boundまで降下したら,_stateを停止状態に変更する
         引数 screen：画面Surface
         """
         if self.rect.centery > self.bound:
@@ -232,7 +240,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 0
+        self.value = 1000
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -263,7 +271,14 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
-        screen.blit(bg_img, [0, 0])
+            # 追加機能4: 
+            if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:  # ★変更箇所: 右Shiftキーで無敵状態を発動
+                if score.value > 100:
+                    bird.state = "hyper"
+                    bird.hyper_life = 500
+                    score.value -= 100
+
+        screen.blit(bg_img, [0, 0])  # ★変更箇所: 描画先の座標 [0, 0] を追加してエラーを修正
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
@@ -282,12 +297,17 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
 
-        for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
-            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
-            score.update(screen)
-            pg.display.update()
-            time.sleep(2)
-            return
+        # 追加機能4
+        for bomb in pg.sprite.spritecollide(bird, bombs, True): 
+            if bird.state == "hyper":  # ★変更箇所: 無敵状態の場合はゲームオーバーにならず爆弾を消す
+                exps.add(Explosion(bomb, 50)) 
+                score.value += 1               
+            else:  # ★変更箇所: 通常状態の場合は従来通りゲームオーバー処理
+                bird.change_img(8, screen)  
+                score.update(screen)
+                pg.display.update()
+                time.sleep(2)
+                return
 
         bird.update(key_lst, screen)
         beams.update()
